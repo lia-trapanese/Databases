@@ -1,0 +1,254 @@
+-- VISTE
+-- vista delle informazioni complete sugli impiegati
+CREATE OR REPLACE VIEW dettagli_impiegati AS
+	SELECT I.matricola, I.cf, P.nome, P.cognome, I.data_assunzione, P.data_nascita, P.disponibile
+	FROM impiegato I
+	JOIN partecipante P
+ 	ON I.cf = P.cf;
+
+-- numero di interventi effettuati da ogni partecipante (se >0) in ogni campagna
+CREATE OR REPLACE VIEW partecipazioni_campagna (id_campagna, partecipante, interventi_effettuati) AS
+	SELECT campagna, partecipante, count(*) AS numero_partecipazioni
+	FROM partecipazione
+	GROUP BY campagna, partecipante
+	ORDER BY numero_partecipazioni DESC;
+
+-- vista dei mezzi e delle caratteristiche associate
+CREATE OR REPLACE VIEW mezzi_con_caratteristiche(targa, disponibile, capacità, caratteristica_implementata) AS
+	SELECT M.targa, M.disponibile, M.capacità, I.caratteristica
+	FROM mezzo M 
+	LEFT JOIN implementazione I
+	ON M.targa = I.targa
+	ORDER BY M.targa;
+
+-- vista di tutti i dati sui partecipanti
+CREATE OR REPLACE VIEW dati_partecipanti AS
+	SELECT IV.tipo, IV.cf, IV.disponibile, IV.nome, IV.cognome, IV.data_nascita, T.numero AS Numero_Di_Telefono, IV.matricola, IV.data_assunzione, IV.professione_volontario
+	FROM (
+		SELECT *
+		FROM partecipante P
+		LEFT JOIN impiegato I
+		USING (cf)
+	) as IV 
+	LEFT JOIN telefono T 
+	ON (IV.cf = T.proprietario)
+	ORDER BY tipo, cognome;
+
+
+
+-- Procedure per inserire volontari e impiegati
+-- non necessaria. Inserita per comodità e simmetria vista la presenza di insert_impiegata
+CREATE OR REPLACE PROCEDURE insert_volontario(cf T_CF, nome VARCHAR(20), cognome VARCHAR(20), data_nascita DATE, professione VARCHAR(15))
+AS $$
+	INSERT INTO partecipante(cf, nome, cognome, data_nascita, tipo, professione_volontario)
+	VALUES (cf, nome, cognome, data_nascita, 'volontario', professione);
+$$
+LANGUAGE SQL;
+
+-- necessaria per inserire un impiegato: un impiegato deve trovarsi tra i partecipanti e un partecipante di tipo
+-- impiegato deve trovarsi in impiegato. Il vincolo di foreign key viene verificato solo alla fine.
+CREATE OR REPLACE PROCEDURE insert_impiegato(cf T_CF, matricola T_MATRICOLA, nome VARCHAR(20), cognome VARCHAR(20), data_nascita DATE, data_assunzione DATE)
+AS $$
+	SET CONSTRAINTS FK_cf DEFERRED;
+	INSERT INTO impiegato(matricola, cf, data_assunzione)
+	VALUES (matricola, cf, data_assunzione);
+	INSERT INTO partecipante(cf, nome, cognome, data_nascita, tipo, disponibile)
+	VALUES (cf, nome, cognome, data_nascita, 'impiegato', true);
+$$
+LANGUAGE SQL;
+
+
+--OPERAZIONI PRINCIPALI PREVISTE
+--Op1: Aggiunta di un intervento a una campagna
+-- Semplice INSERT INTO intervento
+
+--Op2: Lettura di tutti gli interventi di una campagna, con la relativa zona coperta
+CREATE OR REPLACE FUNCTION leggi_interventi (id_camp T_ID_CAMP) 
+RETURNS TABLE (numero_intervento UNSIGNED_INT, zona T_CODICE_ZONA, data_inizio TIMESTAMP, data_fine TIMESTAMP) AS $$
+	BEGIN
+		RETURN QUERY
+			SELECT I.numero, CAST (I.zona as T_CODICE_ZONA), I.data_inizio, I.data_fine
+			FROM intervento as I
+			WHERE I.campagna = id_camp;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+--Op3: Lettura del numero di interventi che hanno coperto le zone di interesse in una campagna
+CREATE OR REPLACE FUNCTION num_cop_zone_interesse (id_camp T_ID_CAMP) 
+RETURNS TABLE (zona T_CODICE_ZONA, numero_di_interventi UNSIGNED_INT) AS $$
+	BEGIN
+		RETURN QUERY
+			SELECT CAST (I.zona as T_CODICE_ZONA), I.numero_coperture
+			FROM interesse as I
+			WHERE I.campagna = id_camp;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+--Op4: Ricerca dei partecipanti coinvolti in un intervento
+CREATE OR REPLACE FUNCTION partecipanti_intervento (id_camp T_ID_CAMP, num_intervento UNSIGNED_INT) 
+RETURNS TABLE (tipo VARCHAR(10), CF T_CF, nome VARCHAR(20), cognome VARCHAR(20)) AS $$
+	BEGIN
+		RETURN QUERY
+			SELECT partecipante.tipo, CAST (partecipante.CF as T_CF), partecipante.nome, partecipante.cognome
+			FROM partecipazione
+			JOIN partecipante ON partecipazione.partecipante = partecipante.CF
+			WHERE partecipazione.campagna = id_camp AND partecipazione.numero = num_intervento;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+--Op5: Ricerca dei mezzi utilizzati in un intervento
+CREATE OR REPLACE FUNCTION mezzi_intervento (id_camp T_ID_CAMP, num_intervento UNSIGNED_INT) 
+RETURNS TABLE (targa T_TARGA) AS $$
+	BEGIN
+		RETURN QUERY
+			SELECT CAST(utilizzo.targa AS T_TARGA)
+			FROM utilizzo
+			WHERE utilizzo.campagna = id_camp AND utilizzo.numero = num_intervento;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+--Op6: Ricerca della zona coperta da un intervento con le relative strade
+CREATE OR REPLACE FUNCTION zona_strade_coperte (id_camp T_ID_CAMP, num_intervento UNSIGNED_INT) 
+RETURNS TABLE (zona T_CODICE_ZONA, nome_strada VARCHAR(30), CAP T_CAP) AS $$
+	BEGIN
+		RETURN QUERY
+			SELECT CAST(inclusione.zona AS T_CODICE_ZONA), inclusione.nome, CAST(inclusione.CAP AS T_CAP)
+			FROM inclusione
+			WHERE inclusione.zona = (SELECT intervento.zona FROM intervento WHERE campagna = id_camp AND numero = num_intervento);
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+--Op7: Ricerca degli interventi in corso
+CREATE OR REPLACE FUNCTION interventi_in_corso () 
+RETURNS TABLE (id_camp T_ID_CAMP, num_intervento UNSIGNED_INT, data_fine TIMESTAMP) AS $$
+	DECLARE now TIMESTAMP := LOCALTIMESTAMP;
+	BEGIN
+		RETURN QUERY
+			SELECT intervento.campagna, intervento.numero, intervento.data_fine
+			FROM intervento
+			WHERE intervento.data_fine > now AND intervento.data_inizio < now;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+-- Op8: Ricerca dei mezzi disponibili in un dato intervallo temporale
+CREATE OR REPLACE FUNCTION mezzi_disponibili (ora_inizio TIMESTAMP, ora_fine TIMESTAMP) 
+RETURNS TABLE (targa T_TARGA, capacità UNSIGNED_INT, caratteristica VARCHAR(20)) AS $$
+	BEGIN
+    RETURN QUERY
+		SELECT M.targa, M.capacità, M.caratteristica_implementata AS Caratteristica
+		FROM mezzi_con_caratteristiche AS M
+		WHERE M.disponibile AND M.targa NOT IN (
+			SELECT U.Targa --Ottengo tutti i mezzi utilizzati nell'intervallo di interesse
+			FROM intervento I
+			JOIN utilizzo U
+			ON (I.campagna = U.campagna AND I.numero = U.numero)
+			WHERE (I.data_inizio BETWEEN ora_inizio AND ora_fine) OR (I.data_fine BETWEEN ora_inizio AND ora_fine)
+		)
+		ORDER BY M.targa;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+-- Op9: Ricerca di partecipanti disponibili in un dato intervallo temporale
+CREATE OR REPLACE FUNCTION partecipanti_disponibili (ora_inizio TIMESTAMP, ora_fine TIMESTAMP) 
+RETURNS TABLE (Tipo VARCHAR(10), CF T_CF, Nome VARCHAR (20), Cognome VARCHAR(20), Data_Di_Nascita DATE, Professione_Volontario VARCHAR(15)) AS $$
+	BEGIN
+	RETURN QUERY
+		SELECT P.tipo, P.CF, P.Nome, P.Cognome, P.Data_Nascita, P.Professione_Volontario
+		FROM partecipante P
+		WHERE P.disponibile AND NOT EXISTS (
+			SELECT PZ.partecipante
+			FROM intervento I
+			JOIN partecipazione PZ
+			ON (I.campagna = PZ.campagna AND I.numero = PZ.numero)
+			WHERE PZ.partecipante = P.CF AND I.data_inizio BETWEEN ora_inizio AND ora_fine OR I.data_fine BETWEEN ora_inizio AND ora_fine
+		)
+		ORDER BY P.tipo, P.cognome;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+-- Op10: Lettura delle informazioni di un partecipante
+CREATE OR REPLACE FUNCTION lettura_partecipante (cf_par T_CF) 
+RETURNS TABLE (Tipo VARCHAR(10), CF T_CF, Disponibile BOOLEAN, Nome VARCHAR (20), Cognome VARCHAR(20), Data_Di_Nascita DATE, Numero_Di_Telefono VARCHAR(15), Matricola_Impiegato T_Matricola, Data_Assunzione_Impiegato DATE, Professione_Volontario VARCHAR(15)) AS $$
+	BEGIN
+	RETURN QUERY
+		SELECT *
+		FROM dati_partecipanti P
+		WHERE P.CF = cf_par;
+	END; 
+$$ 
+LANGUAGE 'plpgsql';
+
+
+--QUERY PER IL TEST DELLE OPERAZIONI PRINCIPALI
+--Op2
+SELECT * FROM leggi_interventi('Covid19-2');
+--Op3
+SELECT * FROM num_cop_zone_interesse('Covid19-2');
+--Op4
+SELECT * FROM partecipanti_intervento('Covid19-2', 1);
+--Op5
+SELECT * FROM mezzi_intervento('Covid19-1', 1);
+--Op6
+SELECT * FROM zona_strade_coperte('Covid19-1', 2);
+--Op7
+SELECT * FROM interventi_in_corso();
+--Op8
+SELECT * FROM mezzi_disponibili('2020-05-14 10:55', '2020-05-14 12:56');
+--Op9
+SELECT * FROM partecipanti_disponibili('2020-05-14 9:30', '2020-05-14 9:35');
+--Op10
+SELECT * FROM lettura_partecipante('SRRGCR99B11C361H');
+
+
+
+--QUERY NON BANALI
+--Vedi anche Op8, Op9 e Op10
+
+--Numero di interventi effettuati sulle zone coperte almeno due volte, in base alla campagna
+SELECT zona as Zona_Coperta, COUNT(zona) as interventi_effettuati, campagna
+FROM intervento
+GROUP BY campagna, zona
+HAVING COUNT(zona)>=2
+ORDER BY zona, campagna;
+
+--Media del numero di partecipanti per gli interventi di una campagna che hanno coinvolto almeno due mezzi
+SELECT R.campagna, CAST(AVG(R.numero_partecipanti) as numeric(10,2)) as media_partecipanti
+FROM (	
+	SELECT I.campagna AS Campagna, I.Numero AS Intervento, count(DISTINCT P.partecipante) AS Numero_Partecipanti
+	FROM intervento I, partecipazione P, utilizzo U
+	WHERE I.campagna = P.campagna AND I.numero = P.Numero AND I.Campagna = U.Campagna AND I.Numero = U.Numero
+	GROUP BY I.campagna, I.numero
+	HAVING count(DISTINCT U.targa)>=2
+) AS R
+GROUP BY R.campagna;
+
+-- Query insiemistica che restituisce tutte le zone che non sono mai state coperte da un intervento in una campagna
+SELECT Z.codice, Z.descrizione
+FROM interesse I 
+JOIN zona Z ON (I.zona = Z.codice)
+WHERE I.campagna = 'DISINF-01'
+EXCEPT
+SELECT Z.codice, Z.descrizione
+FROM intervento I
+JOIN zona Z ON (I.zona = Z.codice)
+WHERE I.Campagna = 'DISINF-01';
+
+--Partecipante più attivo in ogni campagna
+SELECT PC.id_campagna, P.cf, P.nome, P.cognome, PC.interventi_effettuati
+FROM partecipazioni_campagna PC
+JOIN partecipante P
+ON PC.partecipante = P.cf
+WHERE (id_campagna, interventi_effettuati) IN (
+	-- numero più altro di interventi effettuati da un partecipante in ogni campagna
+	SELECT id_campagna, MAX(interventi_effettuati)
+	FROM partecipazioni_campagna
+	GROUP BY id_campagna
+);

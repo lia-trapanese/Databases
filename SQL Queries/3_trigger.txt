@@ -1,0 +1,362 @@
+CREATE OR REPLACE FUNCTION insert_campagna()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF NEW.responsabile NOT IN (
+			SELECT I.matricola
+			FROM impiegato I
+			WHERE I.matricola = NEW.responsabile AND I.cf IN (
+				SELECT P.cf 
+				FROM partecipante P 
+				WHERE P.tipo = 'impiegato' AND P.disponibile
+			) 
+		) THEN 
+			RAISE EXCEPTION 'Il responsabile selezionato non è disponibile';
+		END IF;
+		IF NEW.data_fine IS NOT NULL THEN
+			RAISE EXCEPTION 'Non è possibile creare una campagna con una data di fine';
+		END IF;
+		RETURN NEW;
+	END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_campagna_insert AFTER INSERT ON campagna
+FOR EACH ROW
+EXECUTE PROCEDURE insert_campagna();
+
+
+CREATE OR REPLACE FUNCTION update_campagna()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF NEW.responsabile NOT IN (
+			SELECT I.matricola
+			FROM impiegato I
+			WHERE I.matricola = NEW.responsabile AND I.cf IN (
+				SELECT P.cf 
+				FROM partecipante P 
+				WHERE P.tipo = 'impiegato' AND P.disponibile
+			) 
+		) THEN 
+      		RAISE EXCEPTION 'Il responsabile selezionato non è disponibile';
+    	END IF;
+
+		IF NEW.data_fine IS NOT NULL THEN
+			IF EXISTS (
+				SELECT * 
+				FROM intervento I 
+				WHERE I.campagna = NEW.id AND I.data_fine >= LOCALTIMESTAMP
+			) THEN 
+				RAISE EXCEPTION 'Non è possibile concludere una campagna i cui interventi non sono ancora conclusi';
+			END IF;
+
+			IF EXISTS (
+				SELECT *
+				FROM interesse I
+				WHERE I.campagna = NEW.id AND I.numero_coperture = 0
+			) THEN 
+				RAISE EXCEPTION 'Non è possibile concludere una campagna le cui zone non sono state coperte da almeno un intervento';
+			END IF;
+		END IF;
+		RETURN NEW;
+	END;
+$$
+LANGUAGE plpgsql;
+    
+CREATE TRIGGER trig_update_campagna AFTER UPDATE ON campagna
+FOR EACH ROW
+EXECUTE PROCEDURE update_campagna();
+
+
+CREATE OR REPLACE FUNCTION insert_intervento()
+RETURNS TRIGGER AS $$
+	DECLARE nuovo_numero UNSIGNED_INT;
+	BEGIN
+		IF NEW.data_inizio < (
+			SELECT C.data_inizio
+			FROM campagna C
+			WHERE NEW.campagna = C.ID
+		) THEN RAISE EXCEPTION 'Non è possibile aggiungere l’intervento, la sua data di inizio è antecedente a quella della campagna';
+		END IF;
+		
+		IF NEW.campagna IN (
+			SELECT C.id
+			FROM campagna C
+			WHERE data_fine IS NOT NULL
+		) THEN RAISE EXCEPTION 'Non è possibile aggiungere l’intervento, la campagna specificata è terminata';
+		END IF;
+
+		IF NEW.zona NOT IN (
+			SELECT I.zona
+			FROM interesse I
+			WHERE I.campagna = NEW.campagna
+		) THEN RAISE EXCEPTION 'La zona specificata non è di interesse per la campagna selezionata';
+		END IF;
+
+		IF NEW.numero IS NULL THEN
+			SELECT MAX(numero)+1 INTO nuovo_numero 
+			FROM intervento
+			GROUP BY campagna
+			HAVING intervento.campagna = NEW.campagna;
+			IF nuovo_numero IS NULL THEN
+				nuovo_numero := 1;
+			END IF;
+			NEW.numero = nuovo_numero;	
+		END IF;
+		
+		UPDATE interesse 
+		SET numero_coperture = numero_coperture+1
+		WHERE zona = NEW.zona AND campagna = NEW.campagna;
+		RETURN NEW;
+    END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_intervento_insert BEFORE INSERT ON intervento 
+FOR EACH ROW
+EXECUTE PROCEDURE insert_intervento();
+
+
+CREATE OR REPLACE FUNCTION update_intervento()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF NEW.campagna <> OLD.campagna THEN 
+			RAISE EXCEPTION 'Non è possibile cambiare la campagna di appartenenza';
+		END IF;
+
+		IF NEW.zona <> OLD.zona THEN
+			IF NEW.zona NOT IN (
+				SELECT I.zona
+				FROM interesse I
+				WHERE I.campagna = NEW.campagna
+			) THEN 
+				RAISE EXCEPTION 'La nuova zona specificata non è di interesse per la campagna selezionata';
+			END IF;
+			UPDATE interesse 
+			SET numero_coperture = numero_coperture+1
+			WHERE zona = NEW.zona AND campagna = NEW.campagna;
+			UPDATE interesse 
+			SET numero_coperture = numero_coperture-1
+			WHERE zona = OLD.zona AND campagna = OLD.campagna;
+		END IF;
+
+		RETURN NEW;
+    END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_intervento_update AFTER UPDATE ON intervento 
+FOR EACH ROW
+EXECUTE PROCEDURE update_intervento ();
+
+
+
+CREATE OR REPLACE FUNCTION delete_intervento()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF OLD.campagna IN (
+			SELECT C.id
+			FROM campagna C
+			WHERE data_fine IS NOT NULL
+		) THEN 
+			RAISE EXCEPTION 'Non è possibile rimuovere un intervento da una campagna già terminata';
+		END IF;
+		UPDATE interesse 
+		SET numero_coperture = numero_coperture-1
+		WHERE zona = OLD.zona AND campagna = OLD.campagna;
+		RETURN NULL;
+	END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_intervento_delete AFTER DELETE ON intervento 
+FOR EACH ROW
+EXECUTE PROCEDURE delete_intervento();
+
+
+CREATE OR REPLACE FUNCTION update_interesse()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF OLD.numero_coperture>0 AND (NEW.campagna <> OLD.campagna OR NEW.zona <> OLD.zona) THEN
+			RAISE EXCEPTION 'Non è possibile aggiornare la tabella interesse';
+		END IF;
+
+		IF NEW.campagna IN (
+			SELECT C.id
+			FROM campagna C
+			WHERE data_fine IS NOT NULL
+		) THEN 
+			RAISE EXCEPTION 'Non è possibile modificare gli interessi di una campagna conclusa';
+		END IF;
+		
+		RETURN NULL;
+	END;
+$$
+LANGUAGE plpgsql;
+    
+CREATE TRIGGER trig_interesse_update AFTER UPDATE ON interesse
+FOR EACH ROW
+EXECUTE PROCEDURE update_interesse();
+
+
+CREATE OR REPLACE FUNCTION delete_interesse()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF OLD.numero_coperture > 0 THEN
+			RAISE EXCEPTION 'Non è possibile eliminare la zona inserita da quelle interessate dalla campagna selezionata. Vi è già stato effettuato almeno un intervento';
+		END IF;
+		RETURN NULL;
+	END;
+$$
+LANGUAGE plpgsql;
+		
+CREATE TRIGGER trig_interesse_delete AFTER DELETE ON interesse
+FOR EACH ROW
+EXECUTE PROCEDURE delete_interesse();
+
+
+
+
+CREATE OR REPLACE FUNCTION insert_partecipante()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF NEW.tipo = 'impiegato' THEN
+			IF NOT EXISTS (
+				SELECT *
+				FROM impiegato I
+				WHERE I.cf = NEW.cf
+			) THEN
+				RAISE EXCEPTION 'Impossibile inserire un partecipante di tipo impiegato che non esiste nella tabella impiegato';
+			END IF;
+		END IF;
+		RETURN NULL;
+    END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_partecipante_insert AFTER INSERT ON partecipante 
+FOR EACH ROW
+EXECUTE PROCEDURE insert_partecipante();
+
+
+
+CREATE OR REPLACE FUNCTION update_partecipante()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF OLD.disponibile = TRUE AND NEW.disponibile = FALSE THEN
+			IF NEW.tipo = 'impiegato' AND EXISTS (
+				SELECT * 
+				FROM campagna C
+				WHERE C.data_fine IS NULL AND C.responsabile IN (
+					SELECT I.matricola
+					FROM impiegato I 
+					WHERE NEW.cf = I.cf
+				)
+			) THEN 
+				RAISE EXCEPTION 'Il partecipante indicato è responsabile di una campagna attiva';
+			END IF;
+			IF NEW.disponibile = FALSE AND NEW.cf IN (
+				SELECT P.partecipante
+				FROM intervento I
+				JOIN partecipazione P ON (I.campagna = P.campagna AND i.numero = P.numero)
+				WHERE LOCALTIMESTAMP <= I.data_fine
+			) THEN 
+				RAISE EXCEPTION 'Non è possibile modificare la disponibilità di un partecipante coinvolto in un intervento ancora non concluso';
+			END IF;
+		END IF;
+	
+		IF OLD.tipo = 'volontario' AND NEW.tipo = 'impiegato' THEN
+			IF NOT EXISTS (
+				SELECT *
+				FROM impiegato I
+				WHERE I.cf = NEW.cf
+			) THEN 
+				RAISE EXCEPTION 'Impossibile cambiare da volontario a impiegato se questo non esiste già nella tabella impiegato';
+			END IF;
+		END IF;
+		IF OLD.tipo = 'impiegato' AND NEW.tipo = 'volontario' THEN
+			IF EXISTS (
+				SELECT * 
+				FROM campagna
+				WHERE responsabile IN ( 
+					SELECT matricola
+					FROM impiegato I
+					WHERE I.cf = NEW.cf
+				)
+			) THEN 
+				RAISE EXCEPTION 'Impossibile cambiare da impiegato a volontario se questo è stato il responsabile di una campagna';
+			END IF;
+			DELETE FROM impiegato WHERE cf = NEW.cf;
+		END IF;
+		RETURN NULL;
+    END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_partecipante_update AFTER UPDATE ON partecipante 
+FOR EACH ROW
+EXECUTE PROCEDURE update_partecipante();
+
+
+
+CREATE OR REPLACE FUNCTION delete_impiegato()
+RETURNS TRIGGER AS $$
+	BEGIN
+		DELETE FROM partecipante WHERE cf = NEW.cf;
+		RETURN NULL;
+    END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_impiegato_delete AFTER DELETE ON impiegato 
+FOR EACH ROW
+EXECUTE PROCEDURE delete_impiegato();
+
+
+
+CREATE OR REPLACE FUNCTION update_mezzo()
+RETURNS TRIGGER AS $$
+	BEGIN
+    	IF (NOT NEW.disponibile OR NEW.capacità<>OLD.capacità) AND NEW.targa IN (
+			SELECT U.targa
+			FROM intervento I 
+			JOIN utilizzo U ON (I.campagna = U.campagna AND i.numero = U.numero)
+			WHERE LOCALTIMESTAMP <= I.data_fine
+		) THEN 
+			RAISE EXCEPTION 'Non è possibile modificare la disponibilità o la capacità di un mezzo usato in un intervento ancora non concluso';
+		END IF;
+		RETURN NULL;
+	END;
+$$
+LANGUAGE plpgsql;
+    
+CREATE TRIGGER trig_mezzo_update AFTER UPDATE ON mezzo --non posso modificare la disp di un mezzo se è attivo al momento
+FOR EACH ROW
+EXECUTE PROCEDURE update_mezzo();
+
+
+
+CREATE OR REPLACE FUNCTION partecipazione_check()
+RETURNS TRIGGER AS $$
+	BEGIN
+		IF EXISTS (
+			SELECT *
+			FROM campagna C
+			WHERE C.id = NEW.campagna AND C.data_fine IS NOT NULL
+		) THEN
+			RAISE EXCEPTION 'Non è possibile aggiungere partecipanti ad interventi che appartengono ad una campagna terminata';
+		END IF;
+		IF EXISTS (
+			SELECT *
+			FROM partecipante P
+			WHERE P.cf = NEW.partecipante AND NOT P.disponibile
+		) THEN
+			RAISE EXCEPTION 'Non è possibile impegnare partecipanti non disponibili';
+		END IF;
+		RETURN NEW;
+	END;
+$$
+LANGUAGE plpgsql; 
+
+CREATE TRIGGER trig_partecipazione AFTER INSERT OR UPDATE ON partecipazione
+FOR EACH ROW
+EXECUTE PROCEDURE partecipazione_check();

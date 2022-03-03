@@ -1,0 +1,134 @@
+CREATE DOMAIN T_ID_CAMP CHAR(10);
+CREATE DOMAIN T_CODICE_ZONA CHAR(6);
+CREATE DOMAIN T_CF CHAR(16) CHECK (VALUE SIMILAR TO '[0-9A-Za-z]+');
+CREATE DOMAIN T_CAP CHAR(5) CHECK (VALUE SIMILAR TO '\d+');
+CREATE DOMAIN T_MATRICOLA CHAR(10) CHECK (VALUE SIMILAR TO '\d+');
+CREATE DOMAIN T_TARGA VARCHAR(10);
+CREATE DOMAIN UNSIGNED_INT INT CHECK (VALUE >= 0);
+
+CREATE TABLE partecipante (
+	cf					T_CF			PRIMARY KEY,
+	nome				VARCHAR(20)		NOT NULL,
+	cognome				VARCHAR(20)		NOT NULL,
+	data_nascita		DATE			NOT NULL,
+	tipo				VARCHAR(10)		NOT NULL,
+	disponibile			BOOLEAN			NOT NULL DEFAULT TRUE,
+	professione_volontario VARCHAR(15),
+	CONSTRAINT CHK_tipo_partecipante CHECK (tipo = 'volontario' or tipo = 'impiegato')
+);
+
+CREATE TABLE impiegato (
+	matricola			T_MATRICOLA		PRIMARY KEY,
+	cf					T_CF	 		UNIQUE NOT NULL,
+	data_assunzione 	DATE 			NOT NULL,
+	CONSTRAINT FK_cf FOREIGN KEY (cf) REFERENCES partecipante(cf)
+		ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE
+);
+
+CREATE TABLE campagna (
+	id					T_ID_CAMP 		PRIMARY KEY,
+	descrizione			VARCHAR(200)	NOT NULL,
+	data_inizio			DATE			NOT NULL,
+	data_fine			DATE,
+	responsabile		T_MATRICOLA		NOT NULL,
+	CONSTRAINT FK_responsabile FOREIGN KEY (responsabile) REFERENCES impiegato(matricola)
+		ON UPDATE CASCADE ON DELETE RESTRICT,
+	CONSTRAINT CHK_data CHECK (data_fine IS NULL OR (data_fine>data_inizio AND data_fine<=LOCALTIMESTAMP))
+);
+
+CREATE TABLE zona (
+	codice				T_CODICE_ZONA	PRIMARY KEY,
+	descrizione			VARCHAR(50)		NOT NULL
+);
+
+CREATE TABLE strada (
+	nome				VARCHAR(30),
+	cap					T_CAP,
+	CONSTRAINT PK_strada PRIMARY KEY (nome, cap)
+);
+
+CREATE TABLE interesse (
+	campagna			T_ID_CAMP,
+	zona				T_CODICE_ZONA,
+	numero_coperture 	UNSIGNED_INT	NOT NULL DEFAULT 0,
+	CONSTRAINT PK_interesse PRIMARY KEY (campagna, zona),
+	CONSTRAINT FK_interesse_campagna FOREIGN KEY (campagna) REFERENCES campagna(id)
+		ON UPDATE CASCADE ON DELETE CASCADE,
+	CONSTRAINT FK_interesse_zona FOREIGN KEY (zona) REFERENCES zona(codice)
+		ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE inclusione (
+	nome				VARCHAR(30),
+	cap					T_CAP,
+	zona				T_CODICE_ZONA,
+	CONSTRAINT PK_inclusione PRIMARY KEY (nome, cap, zona),
+	CONSTRAINT FK_zona FOREIGN KEY (zona) REFERENCES zona(codice)
+		ON UPDATE CASCADE ON DELETE CASCADE,
+	CONSTRAINT FK_inclusione_strada FOREIGN KEY (nome, cap) REFERENCES strada(nome, cap)
+		ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE intervento (
+	campagna			T_ID_CAMP,
+	numero				UNSIGNED_INT,
+	zona				T_CODICE_ZONA	NOT NULL,
+	data_inizio			TIMESTAMP		NOT NULL,
+	data_fine			TIMESTAMP		NOT NULL,
+	CONSTRAINT PK_intervento PRIMARY KEY (campagna,numero),
+	CONSTRAINT FK_campagna FOREIGN KEY (campagna) REFERENCES campagna(id)
+		ON UPDATE CASCADE ON DELETE RESTRICT,
+	CONSTRAINT FK_zona FOREIGN KEY (zona) REFERENCES zona(codice)
+		ON UPDATE CASCADE ON DELETE RESTRICT,
+	CONSTRAINT CHK_data CHECK (data_fine>data_inizio)
+);
+
+CREATE TABLE partecipazione (
+	campagna			T_ID_CAMP,
+	numero				UNSIGNED_INT,
+	partecipante		T_CF,
+	CONSTRAINT PK_partecipazione PRIMARY KEY (campagna, numero, partecipante),
+	CONSTRAINT FK_intervento FOREIGN KEY (campagna, numero) REFERENCES intervento(campagna, numero)
+		ON UPDATE CASCADE ON DELETE CASCADE,
+	CONSTRAINT FK_partecipante FOREIGN KEY (partecipante) REFERENCES partecipante(cf)
+		ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE telefono ( 
+	numero				VARCHAR(15)	PRIMARY KEY, --per le direttive di E.164 i num di tel sono di max 15 cifre
+	proprietario		T_CF		NOT NULL,
+	CONSTRAINT FK_proprietario FOREIGN KEY (proprietario) REFERENCES partecipante(cf)
+		ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE mezzo (
+	targa				T_TARGA		PRIMARY KEY,
+	capacità			UNSIGNED_INT NOT NULL,
+	disponibile			BOOLEAN		NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE utilizzo ( 
+	campagna			T_ID_CAMP,
+	numero				UNSIGNED_INT,
+	targa				T_TARGA,
+	CONSTRAINT PK_utilizzo PRIMARY KEY (campagna, numero, targa),
+	CONSTRAINT FK_intervento FOREIGN KEY (campagna, numero) REFERENCES intervento(campagna, numero)
+		ON UPDATE CASCADE ON DELETE CASCADE,
+	CONSTRAINT FK_mezzo FOREIGN KEY (targa) REFERENCES mezzo(targa)
+		ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE caratteristica (
+	nome				VARCHAR(20)	PRIMARY KEY,
+	descrizione			VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE implementazione (
+	targa				T_TARGA,
+	caratteristica		VARCHAR(20),
+	CONSTRAINT PK_implementazione PRIMARY KEY (targa, caratteristica),
+	CONSTRAINT FK_mezzo FOREIGN KEY (targa) REFERENCES mezzo(targa)
+		ON UPDATE CASCADE ON DELETE CASCADE,
+	CONSTRAINT FK_caratteristica FOREIGN KEY(caratteristica) REFERENCES caratteristica(nome)
+		ON UPDATE CASCADE ON DELETE CASCADE
+);

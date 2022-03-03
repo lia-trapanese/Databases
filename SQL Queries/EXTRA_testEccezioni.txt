@@ -1,0 +1,109 @@
+--Insert Campagna con responsabile non disponibile
+CALL insert_impiegato('TRZMRK91A13H701P', '1111111111', 'Marusk', 'Triuzzi', '1998-10-06', '2017-10-01');
+UPDATE partecipante
+SET disponibile = false
+WHERE cf = 'TRZMRK91A13H701P';
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile)
+VALUES ('Covid19-5', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '1111111111');
+
+--Insert Campagna con già una data di fine
+INSERT INTO campagna(id, descrizione, data_inizio, data_fine, responsabile)
+VALUES ('Covid19-3', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', LOCALTIMESTAMP - INTERVAL '1 hour', '0612704000');
+
+--Insert Intervento con una zona non di interesse per la campagna di appartenenza
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid19-7', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '0612704000');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('Covid19-7', 'TOR-02', LOCALTIMESTAMP, LOCALTIMESTAMP + INTERVAL '10 hour');
+
+--Insert Intervento con data di inizio antecedente a quella della campagna
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid22-2', 'Descrizione covid22', LOCALTIMESTAMP, '0612704000');
+INSERT INTO interesse(campagna,zona) VALUES ('Covid22-2','TOR-01');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('Covid22-2', 'TOR-01', LOCALTIMESTAMP -INTERVAL '24 hour', LOCALTIMESTAMP + INTERVAL '10 hour');
+
+--Update Campagna con una data di fine antecedente a quella dei suoi interventi 
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid19-8', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '0612704000');
+INSERT INTO interesse(campagna,zona)
+VALUES ('Covid19-8','TOR-02');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('Covid19-8', 'TOR-02', LOCALTIMESTAMP - INTERVAL '2 hour', LOCALTIMESTAMP + INTERVAL '1 hour');
+UPDATE campagna
+SET data_fine = LOCALTIMESTAMP
+WHERE id = 'Covid19-8';
+
+--Update Intervento cambiando la campagna di appartenenza (vietato da scelta progettuale)
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('Covid19-1', 'TOR-02', LOCALTIMESTAMP - INTERVAL '2 hour', LOCALTIMESTAMP - INTERVAL '1 hour');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('Covid19-1', 'TOR-02', LOCALTIMESTAMP - INTERVAL '2 hour', LOCALTIMESTAMP - INTERVAL '1 hour');
+UPDATE intervento
+SET campagna = 'DISINF-02'
+WHERE campagna = 'Covid19-1' AND numero = 2;
+
+--Update Intervento con una zona non di interesse per la campagna di appartenenza
+UPDATE intervento
+SET zona = 'PAS-01'
+WHERE campagna = 'Covid19-1' AND numero = 1
+
+--Delete Intervento da una campagna già terminata
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('TESTTESTC', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '0612704000');
+INSERT INTO interesse(campagna,zona)
+VALUES ('TESTTESTC', 'TOR-02');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('TESTTESTC', 'TOR-02', LOCALTIMESTAMP - INTERVAL '2 hour', LOCALTIMESTAMP - INTERVAL '1 hour');
+UPDATE campagna
+SET data_fine = CURRENT_DATE
+WHERE id = 'TESTTESTC';
+DELETE FROM intervento
+WHERE campagna = 'TESTTESTC';
+
+--Delete Interesse quando è già stato effettuato un intervento su quella campagna
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('TEST0000C', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '0612704000');
+INSERT INTO interesse(campagna,zona)
+VALUES ('TEST0000C','TOR-02');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('TEST0000C', 'TOR-02', LOCALTIMESTAMP - INTERVAL '2 hour', LOCALTIMESTAMP - INTERVAL '1 hour');
+DELETE FROM interesse
+WHERE campagna = 'TEST0000C';
+
+--Update Partecipante (di tipo impiegato) con disponibile=false mentre è responsabile di una campagna
+CALL insert_impiegato('AAAAAA91A13H701P', '1234504000', 'Marusk', 'Triuzzi', '1998-10-06', '2017-10-01');
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid20-0', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '1234504000');
+UPDATE partecipante
+SET disponibile = FALSE
+WHERE cf = 'AAAAAA91A13H701P';
+
+--Update Partecipante (di tipo volontario) con disponibile=false mentre è coinvolto in un intervento non passato
+UPDATE partecipante 
+SET disponibile = TRUE
+WHERE cf = 'TRPSLV98M38H703N';
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('ABCD0000C', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '0612704000');
+INSERT INTO interesse(campagna,zona)
+VALUES ('ABCD0000C','TOR-02');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine)
+VALUES ('ABCD0000C', 'TOR-02', LOCALTIMESTAMP + INTERVAL '3hour', LOCALTIMESTAMP + INTERVAL '10 hour');
+INSERT INTO partecipazione (campagna, numero, partecipante)
+VALUES ('ABCD0000C', 1, 'TRPSLV98M38H703N');
+UPDATE partecipante 
+SET disponibile = FALSE
+WHERE cf = 'TRPSLV98M38H703N';
+
+--Update Partecipante da tipo impiegato a volontario
+CALL insert_impiegato('BAAAAA91A13H701P', '2234504000', 'Marusk', 'Triuzzi', '1998-10-06', '2017-10-01');
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid21-0', 'Test', LOCALTIMESTAMP - INTERVAL '3 day', '2234504000');
+UPDATE partecipante
+SET tipo = 'volontario'
+WHERE cf = 'BAAAAA91A13H701P';
+
+--Insert Partecipante di tipo impiegato che non esiste nella tabella impiegato
+--Per inserire un impiegato si consiglia l'utilizzo della procedura insert_impiegato
+INSERT INTO partecipante(cf,nome,cognome,data_nascita,tipo)
+VALUES ('EGYGSYJSHRGRTWE4','Pino','Ranzulla','1998-12-20', 'impiegato');

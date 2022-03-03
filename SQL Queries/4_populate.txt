@@ -1,0 +1,133 @@
+--Popolamento
+
+--Volontari
+CALL insert_volontario('TRZMNL97P14H703P', 'Lorenzo', 'Triuzzi', '1997-07-06', 'ingegnere');
+CALL insert_volontario('TRPSLV98M38H703N', 'Salvatore', 'Trapanese', '1998-04-05', 'medico');
+CALL insert_volontario('GRDGVN99A14C361H', 'Gennaro', 'Giordano', '1997-01-12', 'professore');
+CALL insert_volontario('BSAGBR98B01C521G', 'Matteo', 'Besani', '1998-01-20', 'maestro');
+
+--Impiegati
+CALL insert_impiegato('RSSMRT99A23C361H', '0000000001', 'Rossi', 'Marta', '1998-11-16', '2015-10-01');
+CALL insert_impiegato('RCCVCN98S16H703M', '0612703920', 'Vincenzo', 'Riccio', '1998-11-16', '2017-10-01');
+CALL insert_impiegato('TRPLIA98M38H703N', '0612704183', 'Lia', 'Trapanese', '1998-10-06', '2017-10-01');
+CALL insert_impiegato('TRZMNL99P14H703P', '0612704000', 'Emanuele', 'Triuzzi', '1999-09-14', '2017-10-01');
+CALL insert_impiegato('SRRGCR99B11C361H', '0612704179', 'Giancarlo', 'Sorrentino', '1999-02-11', '2017-10-01');
+
+--Numeri di telefono
+INSERT INTO telefono (numero, proprietario) values('3484315206', 'SRRGCR99B11C361H');
+INSERT INTO telefono (numero, proprietario) values('123456789', 'RCCVCN98S16H703M');
+INSERT INTO telefono (numero, proprietario) values('987654321', 'TRPLIA98M38H703N');
+INSERT INTO telefono (numero, proprietario) values('000011111', 'TRZMNL99P14H703P');
+
+--Strada
+INSERT INTO strada (nome,cap) VALUES ('Via Florenzano', 84127);
+INSERT INTO strada (nome,cap) VALUES ('Viale Alfonso Tesauro', 84127);
+INSERT INTO strada (nome,cap) VALUES ('Via Domenico Vietri', 84127); 
+INSERT INTO strada (nome,cap) VALUES ('Via Giulio Ruggi', 84127); 
+INSERT INTO strada (nome,cap) VALUES ('Via Sabato Robertelli', 84127); 
+INSERT INTO strada (nome,cap) VALUES ('Via Raffaele Mauri', 84129);
+INSERT INTO strada (nome,cap) VALUES ('Via Martiri Ungheresi', 84129);
+INSERT INTO strada (nome,cap) VALUES ('Via Madonna di Fatima', 84129);
+INSERT INTO strada (nome,cap) VALUES ('Via Francesco Gaeta', 84129);
+INSERT INTO strada (nome,cap) VALUES ('Via Orazio Flacco', 84129);
+INSERT INTO strada (nome,cap) VALUES ('Viale Giuseppe Verdi', 84131);
+INSERT INTO strada (nome,cap) VALUES ('Viale Richard Wagner', 84131);
+INSERT INTO strada (nome,cap) VALUES ('Via Francesco Crispi', 84126);
+INSERT INTO strada (nome,cap) VALUES ('Via Gelso', 84126);
+INSERT INTO strada (nome,cap) VALUES ('Via Valerio Laspro', 84126);
+INSERT INTO strada (nome,cap) VALUES ('Via Barella', 84126);
+INSERT INTO strada (nome,cap) VALUES ('Via Fiume', 84132);
+INSERT INTO strada (nome,cap) VALUES ('Via Luigi Angrisani', 84132);
+INSERT INTO strada (nome,cap) VALUES ('Via Vito Fornari', 84129);
+
+--Zona
+INSERT INTO zona(codice,descrizione) VALUES ('TOR-01', 'zona Torrione alto');
+INSERT INTO zona(codice,descrizione) VALUES ('TOR-02', 'zona Torrione a livello del mare');
+INSERT INTO zona(codice,descrizione) VALUES ('ARB-00', 'zona di Arbostella');
+INSERT INTO zona(codice,descrizione) VALUES ('PAS-01', 'zona di Pastena confinante con torrione');
+INSERT INTO zona(codice,descrizione) VALUES ('MER-02', 'zona adiacente al parco Mercatello');
+INSERT INTO zona(codice,descrizione) VALUES ('CAR-01', 'zona carmine');
+
+--Inclusione
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Raffaele Mauri', 84129, 'PAS-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Martiri Ungheresi', 84129, 'PAS-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Madonna di Fatima', 84129, 'PAS-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Francesco Gaeta', 84129, 'PAS-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Orazio Flacco', 84129, 'PAS-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Viale Giuseppe Verdi', 84131, 'ARB-00');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Viale Richard Wagner', 84131, 'ARB-00');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Florenzano', 84127, 'TOR-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Domenico Vietri', 84127, 'TOR-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Giulio Ruggi', 84127, 'TOR-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Sabato Robertelli', 84127, 'TOR-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Viale Alfonso Tesauro', 84127, 'TOR-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Gelso', 84126, 'CAR-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Valerio Laspro', 84126, 'CAR-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Barella', 84126, 'CAR-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Francesco Crispi', 84126, 'CAR-01');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Fiume', 84132, 'MER-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Vito Fornari', 84129, 'MER-02');
+INSERT INTO inclusione(nome,cap,zona) VALUES ('Via Luigi Angrisani', 84132, 'MER-02');
+
+--Mezzo
+INSERT INTO mezzo(targa, capacità, disponibile) VALUES ('AA000AA',1, false);
+INSERT INTO mezzo(targa, capacità, disponibile) VALUES ('BB000BB',2, true);
+INSERT INTO mezzo(targa, capacità, disponibile) VALUES ('CC000CC',3, true);
+INSERT INTO mezzo(targa, capacità, disponibile) VALUES ('DD000DD',4, false);
+INSERT INTO mezzo(targa, capacità, disponibile) VALUES ('EE000EE',5, true);
+
+--Caratteristica
+INSERT INTO caratteristica(nome, descrizione) VALUES ('elevazione', 'Consente di raggiungere posti elevati');
+INSERT INTO caratteristica(nome, descrizione) VALUES ('irrigazione', 'Consente di irrigare');
+INSERT INTO caratteristica(nome, descrizione) VALUES ('nebulizzazione', 'Consente di nebulizzare liquidi');
+INSERT INTO caratteristica(nome, descrizione) VALUES ('sterilizzazione', 'Consente di sterilizzare superfici');
+
+--Equipaggiamento
+INSERT INTO implementazione(targa, caratteristica) VALUES ('AA000AA','elevazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('AA000AA','irrigazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('BB000BB','elevazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('BB000BB','nebulizzazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('CC000CC','sterilizzazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('DD000DD','irrigazione');
+INSERT INTO implementazione(targa, caratteristica) VALUES ('EE000EE','nebulizzazione');
+
+--Campagna
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid19-1','Descrizione covid19-1',LOCALTIMESTAMP,'0612704000');
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('Covid19-2','Legambiente Covid',LOCALTIMESTAMP,'0612704179');
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('DISINF-01','Disinfetttazione microzone',LOCALTIMESTAMP,'0612704000');
+INSERT INTO campagna(id, descrizione, data_inizio, responsabile) 
+VALUES ('DISINF-02','Disinfettazione macrozone',LOCALTIMESTAMP,'0612703920');
+
+--Interesse
+INSERT INTO interesse(campagna,zona) VALUES ('Covid19-1','TOR-01');
+INSERT INTO interesse(campagna,zona) VALUES ('Covid19-1','TOR-02');
+INSERT INTO interesse(campagna,zona) VALUES ('Covid19-2','TOR-02');
+INSERT INTO interesse(campagna,zona) VALUES ('Covid19-2','ARB-00');
+INSERT INTO interesse(campagna,zona) VALUES ('DISINF-01','ARB-00');
+
+--Interventi
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine) VALUES ('Covid19-1', 'TOR-01', LOCALTIMESTAMP, LOCALTIMESTAMP + INTERVAL '10 hour');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine) VALUES ('Covid19-1', 'TOR-02', LOCALTIMESTAMP + INTERVAL '1 hour', LOCALTIMESTAMP + INTERVAL '3 hour');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine) VALUES ('Covid19-1', 'TOR-01', LOCALTIMESTAMP + INTERVAL '3 hour', LOCALTIMESTAMP + INTERVAL '12 hour');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine) VALUES ('Covid19-2', 'TOR-02', LOCALTIMESTAMP, LOCALTIMESTAMP + INTERVAL '10 hour');
+INSERT INTO intervento(campagna,zona,data_inizio,data_fine) VALUES ('Covid19-2', 'ARB-00', LOCALTIMESTAMP, LOCALTIMESTAMP + INTERVAL '10 hour');
+
+--Partecipazione
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-1', 1, 'TRZMNL99P14H703P');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-1', 1, 'TRPLIA98M38H703N');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-1', 1, 'SRRGCR99B11C361H');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-1', 1, 'GRDGVN99A14C361H');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-1', 2, 'SRRGCR99B11C361H');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-2', 1, 'RCCVCN98S16H703M');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-2', 1, 'GRDGVN99A14C361H');
+INSERT INTO partecipazione (campagna, numero, partecipante) VALUES ('Covid19-2', 1, 'RSSMRT99A23C361H');
+
+--Utilizzo
+INSERT INTO utilizzo(campagna, numero, targa) VALUES ('Covid19-1', 1, 'AA000AA');
+INSERT INTO utilizzo(campagna, numero, targa) VALUES ('Covid19-1', 1, 'BB000BB');
+INSERT INTO utilizzo(campagna, numero, targa) VALUES ('Covid19-1', 2, 'CC000CC');
+INSERT INTO utilizzo(campagna, numero, targa) VALUES ('Covid19-1', 2, 'EE000EE');
+INSERT INTO utilizzo(campagna, numero, targa) VALUES ('Covid19-2', 1, 'AA000AA');
